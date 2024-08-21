@@ -46,12 +46,24 @@ from tabulate import tabulate
 
 from merlin.common.dumper import dump_handler
 from merlin.config import Config
+from merlin.managers.redis_connection import RedisConnectionManager 
 from merlin.spec.specification import MerlinSpec
 from merlin.study.batch import batch_check_parallel, batch_worker_launch
 from merlin.utils import apply_list_of_regex, check_machines, get_procs, get_yaml_var, is_running
 
 
 LOG = logging.getLogger(__name__)
+
+
+def get_vine_redis_connection() -> RedisConnectionManager:
+    """
+    Helper function to obtain the connection to the redis database
+    that's storing the process ID's for the vine factory and vine stem
+    processes.
+
+    :returns: A RedisConnectionManager context manager that's connected to redis
+    """
+    return RedisConnectionManager(1)
 
 
 def run_taskvine(study, run_mode=None):
@@ -92,10 +104,10 @@ def start_taskvine_workers(
         command = ["vine_factory"]
 
         command.append("-T")
-        command.append(f"{spec.batch["type"]}")
+        command.append(f"{spec.batch['type']}")
 
         command.append("-M")
-        command.append(f"{spec.merlin["resources"]["workers"][worker]["manager"]}") 
+        command.append(f"{spec.merlin['resources']['workers'][worker]['manager']}") 
         
         cores = spec.merlin["resources"]["workers"][worker]["cores"]
         if cores:
