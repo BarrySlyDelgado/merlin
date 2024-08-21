@@ -131,6 +131,7 @@ def purge_taskvine_tasks(spec: MerlinSpec, force: bool):
     :param force: If True, purge without asking for confirmation
     """
     # TODO implement purge functionality
+    
     print(spec.merlin["resources"]["managers"])
 
 
@@ -156,7 +157,7 @@ def query_taskvine_study(spec: MerlinSpec):
     for line in lines[1:]:
         line = line.decode("utf-8") 
         manager, host, port, waiting, running, complete, workers = line.split(maxsplit=6)
-        #if manager in spec.merlin["resources"]["managers"]:
+        if manager in spec.merlin["resources"]["managers"]:
         if 1:
             study_info["waiting"] += int(waiting)
             study_info["running"] += int(running)
@@ -168,7 +169,7 @@ def query_taskvine_study(spec: MerlinSpec):
     for line in lines[1:]:
         line = line.decode("utf-8") 
         manager, cores, cores_inuse, memory, memory_inuse, gpus, gpus_inuse = line.split(maxsplit=6)
-        #if manager in spec.merlin["resources"]["managers"]:
+        if manager in spec.merlin["resources"]["managers"]:
         if 1:
             study_info["cores"] += int(cores)
             study_info["cores_inuse"] += int(cores_inuse)
@@ -177,10 +178,8 @@ def query_taskvine_study(spec: MerlinSpec):
             study_info["gpus"] += int(gpus)
             study_info["gpus_inuse"] += int(gpus_inuse)
     headers = list(study_info.keys())
-    values = list(study_info.values())
-    print(headers, values)
+    values = [list(study_info.values())]
     print(tabulate(values, headers=headers))
-    print(study_info)
     
 
 
