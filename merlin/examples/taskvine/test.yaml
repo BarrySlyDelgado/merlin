@@ -16,17 +16,22 @@ study:
     - name: step_0
       description: step 0
       run:
-          cmd: echo step0
+          cmd: echo "executing step 0" 
     - name: step_1
-      description: step 0
+      description: step 1
       run:
-          cmd: echo step0
+          cmd: echo "executing step 1" 
     - name: step_2
       description: step 0
       run:
           cmd: echo step0
 
     - name: step_3
+      description: step 0
+      run:
+          cmd: echo step0
+          depends: [step_0]
+    - name: step_a
       description: step 0
       run:
           cmd: echo step0
@@ -60,7 +65,7 @@ merlin:
     workers:
      default:
       manager: merlin_test_manager
-      steps: [step_1, step_2, step_0, step_3, step_4, step_6, step_7]
+      steps: [step_1, step_2, step_0, step_a, step_3, step_4, step_6, step_7]
     managers:
      merlin_test_manager:
      

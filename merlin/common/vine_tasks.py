@@ -40,6 +40,7 @@ from celery import chain, chord, group, shared_task, signature
 from celery.exceptions import MaxRetriesExceededError, OperationalError, TimeoutError  # pylint: disable=W0622
 from filelock import FileLock, Timeout
 from redis.exceptions import TimeoutError as RedisTimeoutError
+from merlin.managers.redis_connection import RedisConnectionManager
 
 
 # Need to disable an overwrite warning here since celery has an exception that we need that directly
@@ -57,7 +58,6 @@ from merlin.study.status import read_status, status_conflict_handler
 from merlin.utils import dict_deep_merge
 
 import ndcctools.taskvine.stem as stem
-
 
 retry_exceptions = (
     IOError,
@@ -674,35 +674,43 @@ def shutdown_workers(manager):  # pylint: disable=W0613
 
 
 def queue_merlin_study(study, adapter):
-    """
-    Launch tasks based off of a MerlinStudy.
-    """
-    samples = study.samples
-    sample_labels = study.sample_labels
-    egraph = study.dag
-    LOG.info("Calculating task groupings from DAG.")
-    groups_of_chains = egraph.group_tasks("_source")
 
-    # magic to turn graph into celery tasks
-    LOG.info("Converting graph to tasks.")
-    if study.expanded_spec.merlin["resources"]["task_server"] == "taskvine":
-        dag = stem.Chain(
-                stem.Group(
-                    [
-                        stem.Seed(expand_tasks_with_samples,
-                            egraph,
-                            gchain,
-                            samples,
-                            sample_labels,
-                            merlin_step,
-                            adapter,
-                            study.level_max_dirs,
-                        ).set_manager(egraph.step(chain_group[0][0]).get_task_manager())
-                        for gchain in chain_group
-                    ]
-                )
-                for chain_group in groups_of_chains[1:]
-        )
-        LOG.info("Launching tasks.")
-        # TODO VINE possibly setup another method to run DAG local or remote
-        dag.run()
+    # if we are running the stem locally we can just fork
+    # we might have to explore an option to run a command remotely 
+    pid = os.fork()
+    if pid:
+        
+            redis_conn.hset()
+        # TODO send process ID to redis server which can be used to kill tasks later
+    else:
+        """
+        Launch tasks based off of a MerlinStudy.
+        """
+        samples = study.samples
+        sample_labels = study.sample_labels
+        egraph = study.dag
+        LOG.info("Calculating task groupings from DAG.")
+        groups_of_chains = egraph.group_tasks("_source")
+
+        # magic to turn graph into celery tasks
+        LOG.info("Converting graph to tasks.")
+        if study.expanded_spec.merlin["resources"]["task_server"] == "taskvine":
+            dag = stem.Chain(
+                    stem.Group(
+                        [
+                            stem.Seed(expand_tasks_with_samples,
+                                egraph,
+                                gchain,
+                                samples,
+                                sample_labels,
+                                merlin_step,
+                                adapter,
+                                study.level_max_dirs,
+                            ).set_manager(egraph.step(chain_group[0][0]).get_task_manager())
+                            for gchain in chain_group
+                        ]
+                    )
+                    for chain_group in groups_of_chains[1:]
+            )
+            LOG.info("Launching tasks.")
+            dag.run()
