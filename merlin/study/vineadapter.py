@@ -36,6 +36,7 @@ import os
 import socket
 import subprocess
 import time
+import json
 from contextlib import suppress
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
@@ -70,10 +71,9 @@ def run_taskvine(study, run_mode=None):
     """
     Run the given MerlinStudy object. If the run mode is set to "local"
     """
-    # Only import celery stuff if we want celery in charge
+
     # Pylint complains about circular import between merlin.common.tasks -> merlin.router -> merlin.study.celeryadapter
     # For now I think this is still the best way to do this so we'll ignore it
-    from merlin.celery import app  # pylint: disable=C0415
     from merlin.common.vine_tasks import queue_merlin_study  # pylint: disable=C0415, R0401
 
     adapter_config = study.get_adapter_config(override_type="local")
@@ -149,51 +149,41 @@ def purge_taskvine_tasks(spec: MerlinSpec, force: bool):
 
 def query_taskvine_study(spec: MerlinSpec):
     """
-    Query the managers with vine-status.
+    Query the managers with vine-status -l.
 
     :param spec: A MerlinSpec object representing our study
     """
-    study_info = {"waiting":0, 
-                  "running":0,
-                  "complete":0, 
-                  "workers":0,
-                  "cores":0,
-                  "cores_inuse":0,
-                  "memory":0,
-                  "memory_inuse":0,
-                  "gpus":0,
-                  "gpus_inuse":0} 
-    result = subprocess.run(["vine_status"], capture_output=True)
+    study_info = {"Tasks Waiting":0, 
+                  "Tasks Running":0,
+                  "Tasks Complete":0, 
+                  "Workers Connected":0,
+                  "Total Cores":0,
+                  "Cores Inuse":0,
+                  "Total Memory":0,
+                  "Memory Inuse":0,
+                  "Total Gpus":0,
+                  "Gpus Inuse":0} 
+
+    result = subprocess.run(["vine_status", "-l"], capture_output=True)
     # MANAGER HOST PORT WAITING RUNNING COMPLETE WORKERS 
-    lines = result.stdout.splitlines()
-    for line in lines[1:]:
-        line = line.decode("utf-8") 
-        manager, host, port, waiting, running, complete, workers = line.split(maxsplit=6)
-        if manager in spec.merlin["resources"]["managers"]:
-        if 1:
-            study_info["waiting"] += int(waiting)
-            study_info["running"] += int(running)
-            study_info["complete"] += int(complete)
-            study_info["workers"] += int(workers)
-    result = subprocess.run(["vine_status", "-R"], capture_output=True)
-    # MANAGER CORES INUSE MEM(GB) INUSE GPUS INUSE 
-    lines = result.stdout.splitlines()
-    for line in lines[1:]:
-        line = line.decode("utf-8") 
-        manager, cores, cores_inuse, memory, memory_inuse, gpus, gpus_inuse = line.split(maxsplit=6)
-        if manager in spec.merlin["resources"]["managers"]:
-        if 1:
-            study_info["cores"] += int(cores)
-            study_info["cores_inuse"] += int(cores_inuse)
-            study_info["memory"] += int(memory)
-            study_info["memory_inuse"] += int(memory_inuse)
-            study_info["gpus"] += int(gpus)
-            study_info["gpus_inuse"] += int(gpus_inuse)
+    output = result.stdout.decode("utf-8")
+    output = json.loads(output)
+    for entry in output:
+        if entry["project"] in spec.merlin["resources"]["managers"]:
+            study_info["Tasks Waiting"] += entry["tasks_waiting"]
+            study_info["Tasks Running"] += entry["tasks_running"]
+            study_info["Tasks Complete"] += entry["tasks_done"]
+            study_info["Workers Connected"] += entry["workers_total"]
+            study_info["Total Cores"] += entry["cores_total"]
+            study_info["Cores Inuse"] += entry["cores_inuse"]
+            study_info["Total Memory"] += entry["memory_total"]
+            study_info["Memory Inuse"] += entry["memory_inuse"]
+            study_info["Total Gpus"] += entry["gpus_total"]
+            study_info["Gpus Inuse"] += entry["gpus_inuse"]
+        
     headers = list(study_info.keys())
     values = [list(study_info.values())]
     print(tabulate(values, headers=headers))
-    
-
 
 def get_running_managers(celery_app_name: str, test_mode: bool = False) -> List[str]:
     """
